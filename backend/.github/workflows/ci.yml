@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: skillhub-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.6"
+          enable-cache: true
+          cache-dependency-glob: "skillhub-api/uv.lock"
+
+      - name: Install Python (managed by uv)
+        run: uv python install 3.12
+
+      - name: Install dependencies (frozen against uv.lock)
+        run: uv sync --frozen
+
+      - name: Lint
+        run: make lint
+
+      - name: Typecheck
+        run: make typecheck
+
+      - name: Unit tests
+        run: make test-unit
+
+      - name: Export OpenAPI
+        run: make openapi
+
+      - name: Schema diff vs Java baseline
+        run: uv run python scripts/schema_diff.py openapi/java-baseline.json openapi/python-current.json
+        continue-on-error: true  # flip to false once baseline is committed

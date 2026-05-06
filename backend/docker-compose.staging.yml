@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: skillhub
+      POSTGRES_USER: skillhub
+      POSTGRES_PASSWORD: skillhub_staging
+    ports:
+      - "5432:5432"
+    volumes:
+      - skillhub-staging-pg:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - skillhub-staging-minio:/data
+
+  api:
+    build: .
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    env_file:
+      - .env.example
+    environment:
+      SPRING_DATASOURCE_URL: postgresql+asyncpg://skillhub:skillhub_staging@postgres:5432/skillhub
+      SPRING_DATASOURCE_PASSWORD: skillhub_staging
+      REDIS_HOST: redis
+      SKILLHUB_STORAGE_PROVIDER: s3
+      SKILLHUB_STORAGE_S3_ENDPOINT: http://minio:9000
+      SKILLHUB_STORAGE_S3_ACCESS_KEY: minioadmin
+      SKILLHUB_STORAGE_S3_SECRET_KEY: minioadmin
+      SKILLHUB_STORAGE_S3_AUTO_CREATE_BUCKET: "true"
+      BOOTSTRAP_ADMIN_ENABLED: "true"
+    ports:
+      - "8080:8080"
+
+volumes:
+  skillhub-staging-pg:
+  skillhub-staging-minio:
